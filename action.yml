@@ -10,6 +10,9 @@ inputs:
   ecr_image_name:
     description: Define the name of the ECR image registry
     required: true
+  ecr_image_tag:
+    description: Define the tag of the image
+    required: true
   task_definition_contianer_name:
     description: Define the name of the container in the Task Definition
     required: true
@@ -46,7 +49,7 @@ runs:
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_NAME: ${{ inputs.ecr_image_name }}
-        IMAGE_TAG: ${{ steps.commit.outputs.sha }}
+        IMAGE_TAG: ${{ inputs.ecr_image_tag }}
       run: |
         if docker pull $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ; then
             echo "Already existed image; skipping."
