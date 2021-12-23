@@ -1,0 +1,72 @@
+name: "Build image and deploy to ECS"
+description: "Builds de image, uploads to ECR, updates the task definition and deploys new service on ECS"
+inputs:
+  aws_access_key_id:
+    description: AWS Key ID
+    required: true
+  aws_secret_access_key:
+    description: AWS Secret Access Key
+    required: true
+  ecr_image_name:
+    description: Define the name of the ECR image registry
+    required: true
+  task_definition_contianer_name:
+    description: Define the name of the container in the Task Definition
+    required: true
+  ecs_service_name:
+    description: Define the name of the ECS Service
+    required: true
+  ecs_cluster_name:
+    description: Define the name of the ECS Cluster
+    required: true
+  task_definition_path:
+    description: Define the path to the Task Definition
+    required: true
+  working_directory:
+    description: Define the path of working dir to build Dockerimage
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: us-east-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag, and push image to Amazon ECR
+      shell: bash
+      id: build-image
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_NAME: ${{ inputs.ecr_image_name }}
+        IMAGE_TAG: ${{ steps.commit.outputs.sha }}
+      run: |
+        if docker pull $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ; then
+            echo "Already existed image; skipping."
+        else
+          docker build -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+        fi
+        echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ inputs.task_definition_path }}
+        container-name: ${{ inputs.task_definition_contianer_name }}
+        image: ${{ steps.build-image.outputs.image }}
+
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ inputs.ecs_service_name }}
+        cluster: ${{ inputs.ecs_cluster_name }}
