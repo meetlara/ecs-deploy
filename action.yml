@@ -13,7 +13,7 @@ inputs:
   ecr_image_tag:
     description: Define the tag of the image
     required: true
-  task_definition_contianer_name:
+  task_definition_container_name:
     description: Define the name of the container in the Task Definition
     required: true
   ecs_service_name:
@@ -25,9 +25,13 @@ inputs:
   task_definition_path:
     description: Define the path to the Task Definition
     required: true
-  working_directory:
-    description: Define the path of working dir to build Dockerimage
+  build_working_directory:
+    description: Define the path of working directory of code to build Docker image
     required: true
+  docker_build_extra_args:
+    description: Define the extra arguments that you will set to docker build command
+    required: false
+    default: ""
 runs:
   using: "composite"
   steps:
@@ -45,7 +49,7 @@ runs:
     - name: Build, tag, and push image to Amazon ECR
       shell: bash
       id: build-image
-      working-directory: ${{ inputs.working_directory }}
+      working-directory: ${{ inputs.build_working_directory }}
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_NAME: ${{ inputs.ecr_image_name }}
@@ -54,7 +58,7 @@ runs:
         if docker pull $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ; then
             echo "Already existed image; skipping."
         else
-          docker build -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+          docker build ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
         fi
         echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
@@ -64,7 +68,7 @@ runs:
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: ${{ inputs.task_definition_path }}
-        container-name: ${{ inputs.task_definition_contianer_name }}
+        container-name: ${{ inputs.task_definition_container_name }}
         image: ${{ steps.build-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition
