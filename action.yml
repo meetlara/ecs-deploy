@@ -28,9 +28,23 @@ inputs:
   working_directory:
     description: Define the path of working dir to build Dockerimage
     required: true
+  with_testing_db:
+    description: Wether is necessary a testing db or not
+    required: false
+    default: "false"
+  db_schemas:
+    description: DB schemas list to create separated by a space
+    required: false
 runs:
   using: "composite"
   steps:
+    - name: Set up test db
+      id: set-up-test-db
+      if: ${{ inputs.with_testing_db }} == "true"
+      uses: meetlara/set-up-test-db@main
+      with:
+        db_schemas: ${{ inputs.db_schemas }}
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
