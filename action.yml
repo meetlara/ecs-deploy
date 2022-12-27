@@ -40,7 +40,7 @@ runs:
   steps:
     - name: Set up test db
       id: set-up-test-db
-      if: ${{ inputs.with_testing_db }} == "true"
+      if: ${{ inputs.with_testing_db == "true" }} 
       uses: meetlara/set-up-test-db@main
       with:
         db_schemas: ${{ inputs.db_schemas }}
