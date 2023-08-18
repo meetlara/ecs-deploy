@@ -70,9 +70,13 @@ runs:
         IMAGE_NAME: ${{ inputs.ecr_image_name }}
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
       run: |
-        if docker pull $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ; then
+        cache_commit=$(aws ecr describe-images --repository-name stg-chats-service-api --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0], sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]][] | [0]" --output=text)
+        if [ $cache_commit = $IMAGE_TAG ]; then
             echo "Already existed image; skipping."
         else
+          if [ $cache_commit = 'None' ]; then
+              docker pull $ECR_REGISTRY/$IMAGE_NAME:$cache_commit;
+          fi
           docker build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from $ECR_REGISTRY/$IMAGE_NAME ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
         fi
