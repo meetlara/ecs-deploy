@@ -73,7 +73,7 @@ runs:
         if docker pull $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ; then
             echo "Already existed image; skipping."
         else
-          docker build ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+          docker build --cache-from $ECR_REGISTRY/$IMAGE_NAME ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
         fi
         echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
