@@ -71,6 +71,8 @@ runs:
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
       run: |
         cache_commit=$(aws ecr describe-images --repository-name stg-chats-service-api --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0], sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]][] | [0]" --output=text)
+        echo "Got latest docker image on repository. Tag: $cache_commit"
+        
         if [ $cache_commit = $IMAGE_TAG ]; then
             echo "Already existed image; skipping."
         else
