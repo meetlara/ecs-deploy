@@ -75,6 +75,7 @@ runs:
             echo "Already existed image; skipping."
         else
           if [ $cache_commit = 'None' ]; then
+              echo "Downloading latest image from repository for cache purposes."
               docker pull $ECR_REGISTRY/$IMAGE_NAME:$cache_commit;
           fi
           docker build ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
