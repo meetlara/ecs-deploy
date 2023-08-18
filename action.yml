@@ -76,7 +76,7 @@ runs:
         if [ $cache_commit = $IMAGE_TAG ]; then
             echo "Already existed image; skipping."
         else
-          if [ $cache_commit = 'None' ]; then
+          if [ $cache_commit != 'None' ]; then
               echo "Downloading latest image from repository for cache purposes."
               docker pull $ECR_REGISTRY/$IMAGE_NAME:$cache_commit;
           fi
