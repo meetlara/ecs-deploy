@@ -80,7 +80,7 @@ runs:
               echo "Downloading latest image from repository for cache purposes."
               docker pull $ECR_REGISTRY/$IMAGE_NAME:$cache_commit;
           fi
-          docker build ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+          docker build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from $ECR_REGISTRY/$IMAGE_NAME ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
         fi
         echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
