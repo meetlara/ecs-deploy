@@ -61,29 +61,39 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build, tag, and push image to Amazon ECR
-      shell: bash
-      id: build-image
-      working-directory: ${{ inputs.build_working_directory }}
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_NAME: ${{ inputs.ecr_image_name }}
-        IMAGE_TAG: ${{ inputs.ecr_image_tag }}
+    # This is a separate action that sets up buildx runner
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    # So now you can use Actions' own caching!
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    # And make it available for builds
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: false
+        tags: $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+
+      # This ugly bit is necessary if you don't want your cache to grow forever
+      # until it hits GitHub's limit of 5GB.
+      # Temp fix
+      # https://github.com/docker/build-push-action/issues/252
+      # https://github.com/moby/buildkit/issues/1896
+    - name: Move cache
       run: |
-        cache_commit=$(aws ecr describe-images --repository-name stg-chats-service-api --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0], sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]][] | [0]" --output=text)
-        echo "Got latest docker image on repository. Tag: $cache_commit"
-        
-        if [ $cache_commit = $IMAGE_TAG ]; then
-            echo "Already existed image; skipping."
-        else
-          if [ $cache_commit != 'None' ]; then
-              echo "Downloading latest image from repository for cache purposes."
-              docker pull $ECR_REGISTRY/$IMAGE_NAME:$cache_commit;
-          fi
-          docker build ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-        fi
-        echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
