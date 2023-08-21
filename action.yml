@@ -74,16 +74,6 @@ runs:
         restore-keys: |
           ${{ runner.os }}-buildx-
 
-    # And make it available for builds
-    - name: Build and push
-      uses: docker/build-push-action@v2
-      with:
-        context: ${{ inputs.build_working_directory }}
-        push: true
-        tags: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,dest=/tmp/.buildx-cache-new
-
     - name: Build, tag, and push image to Amazon ECR
       shell: bash
       id: build-image
