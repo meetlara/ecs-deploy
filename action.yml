@@ -77,10 +77,14 @@ runs:
     # And make it available for builds
     - name: Build and push
       uses: docker/build-push-action@v2
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_NAME: ${{ inputs.ecr_image_name }}
+        IMAGE_TAG: ${{ inputs.ecr_image_tag }}
       with:
         context: .
         push: false
-        tags: $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+        tags: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new
 
