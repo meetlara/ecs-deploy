@@ -84,16 +84,37 @@ runs:
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new
 
-      # This ugly bit is necessary if you don't want your cache to grow forever
-      # until it hits GitHub's limit of 5GB.
-      # Temp fix
-      # https://github.com/docker/build-push-action/issues/252
-      # https://github.com/moby/buildkit/issues/1896
-    - name: Move cache
+    - name: Build, tag, and push image to Amazon ECR
       shell: bash
+      id: build-image
+      working-directory: ${{ inputs.build_working_directory }}
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_NAME: ${{ inputs.ecr_image_name }}
+        IMAGE_TAG: ${{ inputs.ecr_image_tag }}
       run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+        cache_commit=$(aws ecr describe-images --repository-name stg-chats-service-api --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
+        echo "Got latest docker image on repository. Tag: $cache_commit"
+        
+        if [ $cache_commit = $IMAGE_TAG ]; then
+            echo "Already existed image; skipping."
+        else
+          tmp_dir=" /tmp/ecs-deploy-$(date +%s)"
+          
+          /usr/bin/docker buildx build --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new ${{ inputs.docker_build_extra_args }} --iidfile $tmp_dir/iidfile --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG --metadata-file $tmp_dir/metadata-file --push .
+
+          rm -rf $tmp_dir
+          
+          # This ugly bit is necessary if you don't want your cache to grow forever
+          # until it hits GitHub's limit of 5GB.
+          # Temp fix
+          # https://github.com/docker/build-push-action/issues/252
+          # https://github.com/moby/buildkit/issues/1896
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+        fi
+
+        echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
 
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
