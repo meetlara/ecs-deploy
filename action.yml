@@ -77,17 +77,12 @@ runs:
     # And make it available for builds
     - name: Build and push
       uses: docker/build-push-action@v2
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_NAME: ${{ inputs.ecr_image_name }}
-        IMAGE_TAG: ${{ inputs.ecr_image_tag }}
       with:
-        context: .
-        push: false
+        context: ${{ inputs.build_working_directory }}
+        push: true
         tags: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new
-
 
       # This ugly bit is necessary if you don't want your cache to grow forever
       # until it hits GitHub's limit of 5GB.
@@ -106,7 +101,7 @@ runs:
       with:
         task-definition: ${{ inputs.task_definition_path }}
         container-name: ${{ inputs.task_definition_container_name }}
-        image: ${{ steps.build-image.outputs.image }}
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
