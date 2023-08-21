@@ -90,6 +90,7 @@ runs:
             echo "Already existed image; skipping."
         else
           tmp_dir=" /tmp/ecs-deploy-$(date +%s)"
+          mkdir -p $tmp_dir;
           
           /usr/bin/docker buildx build --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new ${{ inputs.docker_build_extra_args }} --iidfile $tmp_dir/iidfile --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG --metadata-file $tmp_dir/metadata-file --push .
 
