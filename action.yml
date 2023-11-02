@@ -13,7 +13,7 @@ inputs:
   ecr_image_tag:
     description: Define the tag of the image
     required: true
-  task_definition_contianer_name:
+  task_definition_container_name:
     description: Define the name of the container in the Task Definition
     required: true
   ecs_service_name:
@@ -40,7 +40,7 @@ runs:
   steps:
     - name: Set up test db
       id: set-up-test-db
-      if: ${{ inputs.with_testing_db == 'true' }} 
+      if: ${{ inputs.with_testing_db == 'true' }}
       uses: meetlara/set-up-test-db@main
       with:
         db_schemas: ${{ inputs.db_schemas }}
@@ -78,7 +78,7 @@ runs:
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: ${{ inputs.task_definition_path }}
-        container-name: ${{ inputs.task_definition_contianer_name }}
+        container-name: ${{ inputs.task_definition_container_name }}
         image: ${{ steps.build-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition
