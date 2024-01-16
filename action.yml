@@ -61,7 +61,7 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
       with:
-        mask-password: 'false'
+        mask-password: 'false' # TODO: delete to change to 'true' by default (migration v1 to v2)
 
     # This is a separate action that sets up buildx runner
     - name: Set up Docker Buildx
