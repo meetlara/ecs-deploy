@@ -50,7 +50,7 @@ inputs:
     required: false
   second_ecs_cluster_name:
     description: Define the name of the ECS Cluster
-    required: true
+    required: false
 runs:
   using: "composite"
   steps:
