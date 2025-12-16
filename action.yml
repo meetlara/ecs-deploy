@@ -140,8 +140,8 @@ runs:
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       if: ${{ inputs.second_task_definition_path != '' }}
       with:
-        task-definition: ${{ inputs.task_definition_path }}
-        container-name: ${{ inputs.task_definition_container_name }}
+        task-definition: ${{ inputs.second_task_definition_path }}
+        container-name: ${{ inputs.second_task_definition_container_name }}
         image: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
 
     - name: Deploy Amazon ECS task definition (second service)
@@ -149,5 +149,5 @@ runs:
       if: ${{ inputs.second_task_definition_path != '' }}
       with:
         task-definition: ${{ steps.sec-task-def.outputs.task-definition }}
-        service: ${{ inputs.ecs_service_name }}
-        cluster: ${{ inputs.ecs_cluster_name }}
+        service: ${{ inputs.second_ecs_service_name }}
+        cluster: ${{ inputs.second_ecs_cluster_name }}
