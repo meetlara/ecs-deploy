@@ -39,7 +39,18 @@ inputs:
   db_schemas:
     description: DB schemas list to create separated by a space
     required: false
-
+  second_task_definition_path:
+    description: Define the path to the Task Definition
+    required: false
+  second_task_definition_container_name:
+    description: Define the name of the container in the Task Definition
+    required: false
+  second_ecs_service_name:
+    description: Define the name of the ECS Service
+    required: false
+  second_ecs_cluster_name:
+    description: Define the name of the ECS Cluster
+    required: true
 runs:
   using: "composite"
   steps:
@@ -119,6 +130,23 @@ runs:
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ inputs.ecs_service_name }}
+        cluster: ${{ inputs.ecs_cluster_name }}
+        
+    - name: Fill in the new image ID in the Amazon ECS task definition (second service)
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      if: ${{ inputs.second_task_definition_path != '' }}
+      with:
+        task-definition: ${{ inputs.task_definition_path }}
+        container-name: ${{ inputs.task_definition_container_name }}
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
+
+    - name: Deploy Amazon ECS task definition (second service)
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      if: ${{ inputs.second_task_definition_path != '' }}
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         service: ${{ inputs.ecs_service_name }}
