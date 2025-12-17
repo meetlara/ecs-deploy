@@ -99,7 +99,7 @@ runs:
         cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
         echo "Got latest docker image on repository. Tag: $cache_commit"
         
-        if [ "$cache_commit" = $IMAGE_TAG ]; then
+        if [ "$cache_commit" = "$IMAGE_TAG" ]; then
             echo "Already existed image; skipping."
         else
           tmp_dir=" /tmp/ecs-deploy-$(date +%s)"
