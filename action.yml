@@ -95,6 +95,7 @@ runs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_NAME: ${{ inputs.ecr_image_name }}
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
+        DOCKER_BUILD_EXTRA_ARGS: ${{ inputs.docker_build_extra_args }}
       run: |
         cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
         echo "Got latest docker image on repository. Tag: $cache_commit"
@@ -105,7 +106,7 @@ runs:
           tmp_dir=" /tmp/ecs-deploy-$(date +%s)"
           mkdir -p $tmp_dir;
           
-          /usr/bin/docker buildx build --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new ${{ inputs.docker_build_extra_args }} --iidfile $tmp_dir/iidfile --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG --metadata-file $tmp_dir/metadata-file --push .
+          /usr/bin/docker buildx build --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new $DOCKER_BUILD_EXTRA_ARGS --iidfile $tmp_dir/iidfile --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG --metadata-file $tmp_dir/metadata-file --push .
 
           rm -rf $tmp_dir
           
