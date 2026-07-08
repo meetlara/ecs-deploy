@@ -75,10 +75,16 @@ runs:
         mask-password: 'false' # TODO: delete to change to 'true' by default (migration v1 to v2)
 
     # Exposes ACTIONS_RUNTIME_TOKEN / ACTIONS_RESULTS_URL so the raw `docker buildx build`
-    # below can talk to the GitHub Actions cache (type=gha). Not needed by build-push-action,
-    # but required when invoking buildx directly.
+    # below can talk to the GitHub Actions cache (type=gha). Normal `run:` steps don't get
+    # these vars; a JS action does. We use first-party actions/github-script instead of a
+    # third-party action so the runtime token is never handed to an external dependency.
     - name: Expose GitHub Actions runtime
-      uses: crazy-max/ghaction-github-runtime@v3
+      uses: actions/github-script@v7
+      with:
+        script: |
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '')
+          core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '')
+          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '')
 
     # This is a separate action that sets up buildx runner
     - name: Set up Docker Buildx
@@ -107,8 +113,8 @@ runs:
           # scope by image name so multiple images in the same repo don't clobber each
           # other. mode=max caches intermediate stages too.
           /usr/bin/docker buildx build \
-            --cache-from type=gha,scope=$IMAGE_NAME \
-            --cache-to type=gha,mode=max,scope=$IMAGE_NAME \
+            --cache-from "type=gha,scope=$IMAGE_NAME" \
+            --cache-to "type=gha,mode=max,scope=$IMAGE_NAME,ignore-error=true" \
             $DOCKER_BUILD_EXTRA_ARGS \
             --iidfile $tmp_dir/iidfile \
             --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
