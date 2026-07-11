@@ -99,8 +99,12 @@ runs:
           # other. NOTE: mode=max intentionally omitted — it triggers a 400 error against
           # the GHA cache backend (docker/buildx#841). Default mode=min caches the same
           # layers here anyway since the Dockerfile is single-stage.
+          # --cache-from is guarded on ACTIONS_RESULTS_URL: a cache import error can be
+          # fatal to the build (moby/buildkit#2836), so we only attempt the import when
+          # the GHA cache runtime is actually available. Export stays best-effort via
+          # ignore-error. (IMAGE_NAME is an ECR repo name, no spaces, so it's safe unquoted.)
           /usr/bin/docker buildx build \
-            --cache-from "type=gha,version=2,scope=$IMAGE_NAME" \
+            ${ACTIONS_RESULTS_URL:+--cache-from type=gha,version=2,scope=$IMAGE_NAME} \
             --cache-to "type=gha,version=2,scope=$IMAGE_NAME,ignore-error=true" \
             $DOCKER_BUILD_EXTRA_ARGS \
             --iidfile $tmp_dir/iidfile \
