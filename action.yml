@@ -32,13 +32,6 @@ inputs:
     description: Define the extra arguments that you will set to docker build command
     required: false
     default: ""
-  with_testing_db:
-    description: Wether is necessary a testing db or not
-    required: false
-    default: "false"
-  db_schemas:
-    description: DB schemas list to create separated by a space
-    required: false
   second_task_definition_path:
     description: Define the path to the Task Definition
     required: false
@@ -54,13 +47,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Set up test db
-      id: set-up-test-db
-      if: ${{ inputs.with_testing_db == 'true' }}
-      uses: meetlara/set-up-test-db@main
-      with:
-        db_schemas: ${{ inputs.db_schemas }}
-
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -84,7 +70,6 @@ runs:
         script: |
           core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '')
           core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '')
-          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '')
 
     # This is a separate action that sets up buildx runner
     - name: Set up Docker Buildx
@@ -111,10 +96,12 @@ runs:
 
           # GitHub Actions cache (type=gha). It's repo-scoped by GitHub, and we further
           # scope by image name so multiple images in the same repo don't clobber each
-          # other. mode=max caches intermediate stages too.
+          # other. NOTE: mode=max intentionally omitted — it triggers a 400 error against
+          # the GHA cache backend (docker/buildx#841). Default mode=min caches the same
+          # layers here anyway since the Dockerfile is single-stage.
           /usr/bin/docker buildx build \
             --cache-from "type=gha,scope=$IMAGE_NAME" \
-            --cache-to "type=gha,mode=max,scope=$IMAGE_NAME,ignore-error=true" \
+            --cache-to "type=gha,scope=$IMAGE_NAME,ignore-error=true" \
             $DOCKER_BUILD_EXTRA_ARGS \
             --iidfile $tmp_dir/iidfile \
             --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
