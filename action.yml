@@ -47,7 +47,7 @@ inputs:
   force_rebuild:
     description: >-
       Rebuild even if an image for this commit already exists in ECR, and push it under
-      a `<tag>-rebuild-<run>` tag. Needed to pick up a patched base image (e.g. a
+      a `<tag>-rebuild-<utc timestamp>` tag. Needed to pick up a patched base image (e.g. a
       security round on node:24-slim) without pushing a dummy commit just to move the
       SHA. Also forces `--pull` so the mutable base tag is re-resolved instead of
       reusing the cached layer.
@@ -97,15 +97,16 @@ runs:
       run: |
         # Tag actually pushed. Stays $IMAGE_TAG on the normal path; a forced rebuild gets
         # its own tag because these ECR repos are IMMUTABLE, so re-pushing $IMAGE_TAG would
-        # fail with ImageTagAlreadyExistsException. The run id + attempt keeps it unique
-        # even across re-runs of the same workflow run.
+        # fail with ImageTagAlreadyExistsException. A UTC timestamp (to the second) keeps it
+        # unique per action call, not just per run: a workflow that calls this action twice
+        # for the same repo and tag gets two different tags.
         PUSH_TAG="$IMAGE_TAG"
 
         if [ "$FORCE_REBUILD" = "true" ]; then
           # Skip the existing-tag lookup entirely: we know an image for this commit is
           # already there, and we want a new one anyway. Used when the content changed
           # underneath an unchanged commit SHA, i.e. a patched base image.
-          PUSH_TAG="$IMAGE_TAG-rebuild-$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
+          PUSH_TAG="$IMAGE_TAG-rebuild-$(date -u +%Y%m%d%H%M%S)"
           cache_commit=""
           echo "force_rebuild=true; rebuilding as $PUSH_TAG"
         else

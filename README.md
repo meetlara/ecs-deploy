@@ -11,9 +11,10 @@ With `force_rebuild: "true"` the action:
 
 - skips the existing-tag lookup and always builds, with `--pull` so the mutable base tag is
   re-resolved instead of reusing the cached layer;
-- pushes under `<ecr_image_tag>-rebuild-<run_id>.<run_attempt>` instead of the bare tag, because
+- pushes under `<ecr_image_tag>-rebuild-<YYYYMMDDHHMMSS>` (UTC) instead of the bare tag, because
   the ECR repos are `IMMUTABLE` and re-pushing the same tag would fail with
-  `ImageTagAlreadyExistsException`;
+  `ImageTagAlreadyExistsException`. The timestamp is per action call, so two forced calls in
+  the same run (same repo and tag) don't collide;
 - renders both task definitions with that new tag.
 
 Each forced rebuild is one more image in the repo, so it counts against the ECR lifecycle policy.
