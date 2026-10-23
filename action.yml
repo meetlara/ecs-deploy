@@ -44,6 +44,15 @@ inputs:
   second_ecs_cluster_name:
     description: Define the name of the ECS Cluster
     required: false
+  force_rebuild:
+    description: >-
+      Rebuild even if an image for this commit already exists in ECR, and push it under
+      a `<tag>-rebuild-<utc timestamp>` tag. Needed to pick up a patched base image (e.g. a
+      security round on node:24-slim) without pushing a dummy commit just to move the
+      SHA. Also forces `--pull` so the mutable base tag is re-resolved instead of
+      reusing the cached layer.
+    required: false
+    default: "false"
 runs:
   using: "composite"
   steps:
@@ -84,10 +93,27 @@ runs:
         IMAGE_NAME: ${{ inputs.ecr_image_name }}
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
         DOCKER_BUILD_EXTRA_ARGS: ${{ inputs.docker_build_extra_args }}
+        FORCE_REBUILD: ${{ inputs.force_rebuild }}
       run: |
-        cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
-        echo "Got latest docker image on repository. Tag: $cache_commit"
-        
+        # Tag actually pushed. Stays $IMAGE_TAG on the normal path; a forced rebuild gets
+        # its own tag because these ECR repos are IMMUTABLE, so re-pushing $IMAGE_TAG would
+        # fail with ImageTagAlreadyExistsException. A UTC timestamp (to the second) keeps it
+        # unique per action call, not just per run: a workflow that calls this action twice
+        # for the same repo and tag gets two different tags.
+        PUSH_TAG="$IMAGE_TAG"
+
+        if [ "$FORCE_REBUILD" = "true" ]; then
+          # Skip the existing-tag lookup entirely: we know an image for this commit is
+          # already there, and we want a new one anyway. Used when the content changed
+          # underneath an unchanged commit SHA, i.e. a patched base image.
+          PUSH_TAG="$IMAGE_TAG-rebuild-$(date -u +%Y%m%d%H%M%S)"
+          cache_commit=""
+          echo "force_rebuild=true; rebuilding as $PUSH_TAG"
+        else
+          cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
+          echo "Got latest docker image on repository. Tag: $cache_commit"
+        fi
+
         if [ "$cache_commit" = "$IMAGE_TAG" ]; then
             echo "Already existed image; skipping."
         else
@@ -103,19 +129,24 @@ runs:
           # fatal to the build (moby/buildkit#2836), so we only attempt the import when
           # the GHA cache runtime is actually available. Export stays best-effort via
           # ignore-error. (IMAGE_NAME is an ECR repo name, no spaces, so it's safe unquoted.)
-          /usr/bin/docker buildx build \
+          # A forced rebuild exists to pick up a new base image, and the base is
+          # referenced by a mutable tag (e.g. `node:24-slim`), so re-resolve it instead of
+          # trusting whatever digest the cache resolved last time.
+          [ "$FORCE_REBUILD" = "true" ] && PULL_FLAG=--pull || PULL_FLAG=
+
+          /usr/bin/docker buildx build $PULL_FLAG \
             ${ACTIONS_RESULTS_URL:+--cache-from type=gha,version=2,scope=$IMAGE_NAME} \
             --cache-to "type=gha,version=2,scope=$IMAGE_NAME,ignore-error=true" \
             $DOCKER_BUILD_EXTRA_ARGS \
             --iidfile $tmp_dir/iidfile \
-            --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/$IMAGE_NAME:$PUSH_TAG \
             --metadata-file $tmp_dir/metadata-file \
             --push .
 
           rm -rf $tmp_dir
         fi
 
-        echo "image=$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "image=$ECR_REGISTRY/$IMAGE_NAME:$PUSH_TAG" >> $GITHUB_OUTPUT
 
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
@@ -123,7 +154,7 @@ runs:
       with:
         task-definition: ${{ inputs.task_definition_path }}
         container-name: ${{ inputs.task_definition_container_name }}
-        image: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
+        image: ${{ steps.build-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
@@ -139,7 +170,7 @@ runs:
       with:
         task-definition: ${{ inputs.second_task_definition_path }}
         container-name: ${{ inputs.second_task_definition_container_name }}
-        image: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ecr_image_name }}:${{ inputs.ecr_image_tag }}
+        image: ${{ steps.build-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition (second service)
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
